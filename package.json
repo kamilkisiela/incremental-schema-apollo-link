@@ -1,0 +1,57 @@
+{
+  "name": "incremental-schema-apollo-link",
+  "version": "1.1.0",
+  "sideEffects": false,
+  "main": "dist/index.cjs.js",
+  "module": "dist/index.esm.js",
+  "typings": "dist/index.d.ts",
+  "typescript": {
+    "definition": "dist/index.d.ts"
+  },
+  "author": {
+    "name": "Kamil Kisiela",
+    "email": "kamil.kisiela@gmail.com",
+    "url": "https://github.com/kamilkisiela"
+  },
+  "repository": {
+    "url": "git+https://github.com/kamilkisiela/incremental-schema-apollo-link.git",
+    "type": "git"
+  },
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "bob build --single",
+    "test": "jest",
+    "format": "prettier --write {src,test}/**/*.ts"
+  },
+  "peerDependencies": {
+    "apollo-link": "^1.0.0",
+    "graphql": "^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0"
+  },
+  "dependencies": {
+    "tslib": "^2.0.0"
+  },
+  "devDependencies": {
+    "@graphql-tools/schema": "6.0.10",
+    "@types/jest": "26.0.0",
+    "@types/lodash": "4.14.156",
+    "@types/node": "14.0.13",
+    "apollo-link": "1.2.14",
+    "bob-the-bundler": "1.0.2",
+    "graphql": "15.1.0",
+    "husky": "4.2.5",
+    "jest": "26.0.1",
+    "prettier": "2.0.5",
+    "pretty-quick": "2.0.1",
+    "rimraf": "3.0.2",
+    "ts-jest": "26.1.1",
+    "typescript": "3.9.5"
+  },
+  "husky": {
+    "hooks": {
+      "pre-commit": "pretty-quick --staged"
+    }
+  }
+}
