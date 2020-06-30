@@ -1,8 +1,7 @@
-import { ApolloLink, fromPromise } from "apollo-link";
+import { ApolloLink, fromPromise, Operation } from "apollo-link";
 import {
   OperationDefinitionNode,
   DefinitionNode,
-  ExecutionArgs,
   DocumentNode,
   FieldNode,
   execute,
@@ -12,9 +11,13 @@ import {
   OperationTypeNode,
   concatAST,
 } from "graphql";
+import { setContext } from "./context";
 
 type OperationType = "Query" | "Mutation" | "Subscription";
-type ContextBuilder<TContext = {}> = (modules: SchemaModule<TContext>[]) => any;
+type ContextBuilder<TContext = {}> = (input: {
+  modules: SchemaModule<TContext>[];
+  operation: Operation;
+}) => any;
 
 /**
  * Represents the exported keywords of a module
@@ -46,6 +49,14 @@ export type IncrementalSchemaLinkOptions<TContext = {}> = {
     resolvers: any[];
   }): GraphQLSchema;
   contextBuilder?: ContextBuilder<TContext>;
+  terminating?: boolean;
+};
+
+export type WithIncremental<T extends {}> = T & {
+  incremental: {
+    schema: GraphQLSchema;
+    contextValue: any;
+  };
 };
 
 /**
@@ -55,18 +66,25 @@ export function createIncrementalSchemaLink({
   map,
   schemaBuilder,
   contextBuilder,
+  terminating = true,
 }: IncrementalSchemaLinkOptions) {
   const manager = SchemaModulesManager({ map, schemaBuilder, contextBuilder });
 
-  return new ApolloLink((op) =>
-    fromPromise(
-      manager.execute({
-        document: op.query,
-        variableValues: op.variables,
-        operationName: op.operationName,
-      })
-    )
-  );
+  if (terminating) {
+    return new ApolloLink((op) => fromPromise(manager.execute(op)));
+  }
+
+  return setContext(async (op, prev) => {
+    const { schema, contextValue } = await manager.prepare(op as any);
+
+    return {
+      ...prev,
+      incremental: {
+        schema,
+        contextValue,
+      },
+    };
+  });
 }
 
 /**
@@ -88,6 +106,7 @@ function SchemaModulesManager({
 
     return rootFields
       .map((field) => map[operationKind][field])
+      .filter(onlyDefined)
       .filter(onlyUnique);
   }
 
@@ -129,29 +148,40 @@ function SchemaModulesManager({
 
   const buildSchema = memo(_buildSchema, hash, compare);
 
+  async function prepare(
+    operation: Operation
+  ): Promise<{
+    schema: GraphQLSchema;
+    contextValue: any;
+  }> {
+    const modules = collectRequiredModules(operation.query);
+    const modulesToLoad = modules.filter((mod) => !usedModules.includes(mod));
+    const allModules = modulesToLoad.concat(usedModules);
+
+    return {
+      schema: await buildSchema(allModules),
+      contextValue: contextBuilder
+        ? contextBuilder({
+            modules: await loadModules(allModules),
+            operation,
+          })
+        : {},
+    };
+  }
+
   return {
-    async execute({
-      document,
-      variableValues,
-      operationName,
-    }: Pick<
-      ExecutionArgs,
-      "document" | "variableValues" | "operationName"
-    >): Promise<ExecutionResult> {
-      const modules = collectRequiredModules(document);
-      const modulesToLoad = modules.filter((mod) => !usedModules.includes(mod));
-      const allModules = modulesToLoad.concat(usedModules);
+    async execute(operation: Operation): Promise<ExecutionResult> {
+      const { schema, contextValue } = await prepare(operation);
 
       return execute({
-        schema: await buildSchema(allModules),
-        document,
-        variableValues,
-        operationName,
-        contextValue: contextBuilder
-          ? contextBuilder(await loadModules(allModules))
-          : {},
+        schema,
+        document: operation.query,
+        variableValues: operation.variables,
+        operationName: operation.operationName,
+        contextValue,
       });
     },
+    prepare,
   };
 }
 
@@ -196,4 +226,8 @@ function memo<A, R, H>(
 
     return memoizedResult;
   };
+}
+
+function onlyDefined<T>(val: T | undefined): val is T {
+  return typeof val !== "undefined";
 }

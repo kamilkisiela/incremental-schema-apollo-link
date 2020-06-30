@@ -87,6 +87,32 @@ test("load shared module + multiple requested modules", async () => {
   expect(calendarSpy).toBeCalledTimes(1);
 });
 
+test("load shared module only", async () => {
+  const sharedSpy = jest.spyOn(schemaModuleMap, "sharedModule");
+  const chatsSpy = jest.fn(schemaModuleMap.modules[1]);
+  const calendarSpy = jest.fn(schemaModuleMap.modules[0]);
+  const link = createIncrementalSchemaLink({
+    map: {
+      ...schemaModuleMap,
+      modules: [calendarSpy, chatsSpy],
+    },
+    schemaBuilder: makeExecutableSchema,
+  });
+  const result = await executeLink(link, {
+    query: parse(/* GraphQL */ `
+      {
+        ping
+      }
+    `),
+  });
+
+  expect(result.data!.ping).toBe('pong');
+
+  expect(sharedSpy).toBeCalledTimes(1);
+  expect(chatsSpy).not.toBeCalled();
+  expect(calendarSpy).not.toBeCalled();
+});
+
 test("memoize the result of schema building over time", async () => {
   const buildSpy = jest.fn(makeExecutableSchema);
   const link = createIncrementalSchemaLink({

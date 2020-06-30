@@ -3,6 +3,7 @@ import { parse } from "graphql";
 export const typeDefs = parse(/* GraphQL */ `
   type Query {
     _: String
+    ping: String!
   }
 
   type Mutation {
@@ -18,6 +19,11 @@ export const typeDefs = parse(/* GraphQL */ `
 const users = ["Foo", "Bar"];
 
 export const resolvers = {
+  Query: {
+    ping() {
+      return "pong";
+    },
+  },
   User: {
     id(id: number) {
       return id;
