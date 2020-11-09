@@ -35,11 +35,11 @@ type SchemaModuleLoader = () => Promise<SchemaModule>;
  * A map between fields of Queries, Mutations or Subscriptions and Schema Modules
  */
 export type SchemaModuleMap = {
-  modules: SchemaModuleLoader[];
+  modules?: SchemaModuleLoader[];
   sharedModule: SchemaModuleLoader;
-  Query: Record<string, number>;
-  Mutation: Record<string, number>;
-  Subscription: Record<string, number>;
+  Query?: Record<string, number>;
+  Mutation?: Record<string, number>;
+  Subscription?: Record<string, number>;
 };
 
 export type IncrementalSchemaLinkOptions<TContext = {}> = {
@@ -62,12 +62,12 @@ export type WithIncremental<T extends {}> = T & {
 /**
  * Creates an ApolloLink that lazy-loads parts of schema, with resolvers and context.
  */
-export function createIncrementalSchemaLink({
+export function createIncrementalSchemaLink<TContext = {}>({
   map,
   schemaBuilder,
   contextBuilder,
   terminating = true,
-}: IncrementalSchemaLinkOptions) {
+}: IncrementalSchemaLinkOptions<TContext>) {
   const manager = SchemaModulesManager({ map, schemaBuilder, contextBuilder });
 
   if (terminating) {
@@ -105,7 +105,7 @@ function SchemaModulesManager({
     const [rootFields, operationKind] = findRootFieldsAndKind(doc);
 
     return rootFields
-      .map((field) => map[operationKind][field])
+      .map((field) => map[operationKind]?.[field])
       .filter(onlyDefined)
       .filter(onlyUnique);
   }
