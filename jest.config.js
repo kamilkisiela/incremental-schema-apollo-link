@@ -6,7 +6,7 @@ module.exports = {
   rootDir: __dirname,
   globals: {
     "ts-jest": {
-      tsConfig: resolve(__dirname, "tsconfig.test.json"),
+      tsconfig: resolve(__dirname, "tsconfig.test.json"),
     },
   },
   reporters: ["default"],

@@ -1,13 +1,14 @@
-import { execute, toPromise, ApolloLink, GraphQLRequest } from "apollo-link";
+import { execute, ApolloLink, GraphQLRequest } from "@apollo/client/link/core";
+import { toPromise } from "@apollo/client/link/utils";
 import { parse } from "graphql";
 import { makeExecutableSchema } from "@graphql-tools/schema";
-import {
-  createIncrementalSchemaLink,
-  SchemaModuleMap,
-} from "../src";
+import { createIncrementalSchemaLink, SchemaModuleMap } from "../src";
 
 const schemaModuleMap: SchemaModuleMap = {
-  modules: [() => import("./fixtures/calendar"), () => import("./fixtures/chats")],
+  modules: [
+    () => import("./fixtures/calendar"),
+    () => import("./fixtures/chats"),
+  ],
   sharedModule: () => import("./fixtures/shared"),
   Query: {
     events: 0,
@@ -106,7 +107,7 @@ test("load shared module only", async () => {
     `),
   });
 
-  expect(result.data!.ping).toBe('pong');
+  expect(result.data!.ping).toBe("pong");
 
   expect(sharedSpy).toBeCalledTimes(1);
   expect(chatsSpy).not.toBeCalled();

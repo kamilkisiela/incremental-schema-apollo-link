@@ -1,4 +1,6 @@
-import { ApolloLink, fromPromise, Operation } from "apollo-link";
+import { ApolloLink, Operation } from "@apollo/client/link/core";
+import { fromPromise } from "@apollo/client/link/utils";
+import { setContext } from "@apollo/client/link/context";
 import {
   OperationDefinitionNode,
   DefinitionNode,
@@ -11,7 +13,6 @@ import {
   OperationTypeNode,
   concatAST,
 } from "graphql";
-import { setContext } from "./context";
 
 type OperationType = "Query" | "Mutation" | "Subscription";
 type ContextBuilder<TContext = {}> = (input: {
