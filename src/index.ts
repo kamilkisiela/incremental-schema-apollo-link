@@ -14,6 +14,8 @@ import {
   concatAST,
 } from "graphql";
 
+export { schemaBuilder } from "./schema-builder";
+
 type OperationType = "Query" | "Mutation" | "Subscription";
 type ContextBuilder<TContext = {}> = (input: {
   modules: SchemaModule<TContext>[];

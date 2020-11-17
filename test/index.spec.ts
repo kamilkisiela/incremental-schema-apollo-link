@@ -1,7 +1,7 @@
 import { execute, ApolloLink, GraphQLRequest } from "@apollo/client/link/core";
 import { toPromise } from "@apollo/client/link/utils";
 import { parse } from "graphql";
-import { makeExecutableSchema } from "@graphql-tools/schema";
+import { schemaBuilder } from "../src/schema-builder";
 import { createIncrementalSchemaLink, SchemaModuleMap } from "../src";
 
 const schemaModuleMap: SchemaModuleMap = {
@@ -37,7 +37,7 @@ test("load shared module + a used module", async () => {
       ...schemaModuleMap,
       modules: [calendarSpy, chatsSpy],
     },
-    schemaBuilder: makeExecutableSchema,
+    schemaBuilder: schemaBuilder,
   });
   const result = await executeLink(link, {
     query: parse(/* GraphQL */ `
@@ -65,7 +65,7 @@ test("load shared module + multiple requested modules", async () => {
       ...schemaModuleMap,
       modules: [calendarSpy, chatsSpy],
     },
-    schemaBuilder: makeExecutableSchema,
+    schemaBuilder: schemaBuilder,
   });
   const result = await executeLink(link, {
     query: parse(/* GraphQL */ `
@@ -97,7 +97,7 @@ test("load shared module only", async () => {
       ...schemaModuleMap,
       modules: [calendarSpy, chatsSpy],
     },
-    schemaBuilder: makeExecutableSchema,
+    schemaBuilder: schemaBuilder,
   });
   const result = await executeLink(link, {
     query: parse(/* GraphQL */ `
@@ -115,7 +115,7 @@ test("load shared module only", async () => {
 });
 
 test("memoize the result of schema building over time", async () => {
-  const buildSpy = jest.fn(makeExecutableSchema);
+  const buildSpy = jest.fn(schemaBuilder);
   const link = createIncrementalSchemaLink({
     map: schemaModuleMap,
     schemaBuilder: buildSpy,
