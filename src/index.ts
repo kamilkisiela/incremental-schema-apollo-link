@@ -3,6 +3,7 @@ import { fromPromise } from "@apollo/client/link/utils";
 import { setContext } from "@apollo/client/link/context";
 import {
   OperationDefinitionNode,
+  OperationTypeNode,
   DefinitionNode,
   DocumentNode,
   FieldNode,
@@ -10,13 +11,12 @@ import {
   Kind,
   ExecutionResult,
   GraphQLSchema,
-  OperationTypeNode,
   concatAST,
 } from "graphql";
 
 export { schemaBuilder } from "./schema-builder";
 
-type OperationType = "Query" | "Mutation" | "Subscription";
+type OperationType = SchemaDefinition[OperationTypeNode];
 type ContextBuilder<TContext = {}> = (input: {
   modules: SchemaModule<TContext>[];
   operation: Operation;
@@ -34,16 +34,34 @@ type SchemaModule<TContext = {}> = {
  * A function that loads a module
  */
 type SchemaModuleLoader = () => Promise<SchemaModule>;
+
+interface Dependencies {
+  [moduleIndex: string]: number[] | undefined;
+}
+
+type SchemaModuleMapInternal = {
+  modules?: SchemaModuleLoader[];
+  dependencies?: Dependencies;
+  sharedModule: SchemaModuleLoader;
+  types: {
+    [typeName: string]: Record<string, number>;
+  };
+};
+
+type Exact<T> = {
+  [P in keyof T]: T[P];
+};
+
 /**
  * A map between fields of Queries, Mutations or Subscriptions and Schema Modules
  */
-export type SchemaModuleMap = {
-  modules?: SchemaModuleLoader[];
-  sharedModule: SchemaModuleLoader;
-  Query?: Record<string, number>;
-  Mutation?: Record<string, number>;
-  Subscription?: Record<string, number>;
-};
+export type SchemaModuleMap = Exact<SchemaModuleMapInternal>;
+
+interface SchemaDefinition {
+  query: string;
+  mutation: string;
+  subscription: string;
+}
 
 export type IncrementalSchemaLinkOptions<TContext = {}> = {
   map: SchemaModuleMap;
@@ -53,6 +71,7 @@ export type IncrementalSchemaLinkOptions<TContext = {}> = {
   }): GraphQLSchema;
   contextBuilder?: ContextBuilder<TContext>;
   terminating?: boolean;
+  schemaDefinition?: SchemaDefinition;
 };
 
 export type WithIncremental<T extends {}> = T & {
@@ -69,9 +88,30 @@ export function createIncrementalSchemaLink<TContext = {}>({
   map,
   schemaBuilder,
   contextBuilder,
+  schemaDefinition = {
+    query: "Query",
+    mutation: "Mutation",
+    subscription: "Subscription",
+  },
   terminating = true,
 }: IncrementalSchemaLinkOptions<TContext>) {
-  const manager = SchemaModulesManager({ map, schemaBuilder, contextBuilder });
+  if (
+    Object.values(schemaDefinition).length !== 3 ||
+    Object.keys(schemaDefinition).filter(
+      (key) => ["query", "mutation", "subscription"].includes(key) === false
+    ).length !== 0
+  ) {
+    throw new Error(
+      `"options.schemaDefinition" requires all 3 root types to be defined`
+    );
+  }
+
+  const manager = SchemaModulesManager({
+    map,
+    schemaBuilder,
+    contextBuilder,
+    schemaDefinition,
+  });
 
   if (terminating) {
     return new ApolloLink((op) => fromPromise(manager.execute(op)));
@@ -90,6 +130,35 @@ export function createIncrementalSchemaLink<TContext = {}>({
   });
 }
 
+function listDependencies(startAt: number[], map: SchemaModuleMap): number[] {
+  if (!map.dependencies) {
+    return startAt;
+  }
+
+  const visited: number[] = [];
+  const maxId = map.modules?.length || 0;
+
+  function visit(i: number | string) {
+    const id = typeof i === "string" ? parseInt(i, 10) : i;
+
+    if (id < 0 || id >= maxId) {
+      return;
+    }
+
+    if (visited.indexOf(id) === -1) {
+      visited.push(id);
+
+      if (map.dependencies[id]?.length) {
+        map.dependencies[id].forEach(visit);
+      }
+    }
+  }
+
+  startAt.forEach(visit);
+
+  return visited;
+}
+
 /**
  * Manages Schema Module, orchestrates the lazy-loading, deals with schema building etc
  */
@@ -97,6 +166,7 @@ function SchemaModulesManager({
   map,
   schemaBuilder,
   contextBuilder,
+  schemaDefinition,
 }: IncrementalSchemaLinkOptions) {
   let usedModules: number[] = [];
 
@@ -105,12 +175,18 @@ function SchemaModulesManager({
    * and a kind of an operation (Q, M or S)
    */
   function collectRequiredModules(doc: DocumentNode): number[] {
-    const [rootFields, operationKind] = findRootFieldsAndKind(doc);
+    const [rootFields, operationKind] = findRootFieldsAndKind(
+      doc,
+      schemaDefinition
+    );
 
-    return rootFields
-      .map((field) => map[operationKind]?.[field])
-      .filter(onlyDefined)
-      .filter(onlyUnique);
+    return listDependencies(
+      rootFields
+        .map((field) => map.types[operationKind]?.[field])
+        .filter(onlyDefined)
+        .filter(onlyUnique),
+      map
+    );
   }
 
   /**
@@ -188,22 +264,21 @@ function SchemaModulesManager({
   };
 }
 
-function findRootFieldsAndKind(doc: DocumentNode): [string[], OperationType] {
+function findRootFieldsAndKind(
+  doc: DocumentNode,
+  schemaDefinition: SchemaDefinition
+): [string[], OperationType] {
   const op = doc.definitions.find(isOperationNode)!;
 
   const rootFields = op.selectionSet.selections.map(
     (field) => (field as FieldNode).name.value
   );
 
-  return [rootFields, capitalizeFirst(op.operation)];
+  return [rootFields, schemaDefinition[op.operation]];
 }
 
 function isOperationNode(def: DefinitionNode): def is OperationDefinitionNode {
   return def.kind === Kind.OPERATION_DEFINITION;
-}
-
-function capitalizeFirst(str: OperationTypeNode): OperationType {
-  return (str.charAt(0).toUpperCase() + str.slice(1)) as OperationType;
 }
 
 function onlyUnique<T>(val: T, i: number, list: T[]) {

@@ -10,14 +10,16 @@ const schemaModuleMap: SchemaModuleMap = {
     () => import("./fixtures/chats"),
   ],
   sharedModule: () => import("./fixtures/shared"),
-  Query: {
-    events: 0,
-    chats: 1,
+  types: {
+    Query: {
+      events: 0,
+      chats: 1,
+    },
+    Mutation: {
+      addEvent: 0,
+    },
+    Subscription: {},
   },
-  Mutation: {
-    addEvent: 0,
-  },
-  Subscription: {},
 };
 
 function executeLink(link: ApolloLink, operation: GraphQLRequest) {
@@ -112,6 +114,216 @@ test("load shared module only", async () => {
   expect(sharedSpy).toBeCalledTimes(1);
   expect(chatsSpy).not.toBeCalled();
   expect(calendarSpy).not.toBeCalled();
+});
+
+test("load a module with its dependencies", async () => {
+  const map: SchemaModuleMap = {
+    modules: [
+      () => import("./fixtures/calendar"),
+      () => import("./fixtures/chats"),
+    ],
+    dependencies: {
+      0: [1],
+    },
+    sharedModule: () => import("./fixtures/shared"),
+    types: {
+      Query: {
+        events: 0,
+        chats: 1,
+      },
+      Mutation: {
+        addEvent: 0,
+      },
+      Subscription: {},
+    },
+  };
+  const sharedSpy = jest.spyOn(map, "sharedModule");
+  const chatsSpy = jest.fn(map.modules[1]);
+  const calendarSpy = jest.fn(map.modules[0]);
+  const link = createIncrementalSchemaLink({
+    map: {
+      ...map,
+      modules: [calendarSpy, chatsSpy],
+    },
+    schemaBuilder: schemaBuilder,
+  });
+  const result = await executeLink(link, {
+    query: parse(/* GraphQL */ `
+      {
+        events {
+          id
+        }
+      }
+    `),
+  });
+
+  expect(result.data!.events).toBeDefined();
+
+  expect(sharedSpy).toBeCalledTimes(1);
+  expect(chatsSpy).toBeCalledTimes(1);
+  expect(calendarSpy).toBeCalledTimes(1);
+});
+
+test("load a module with its dependencies (including circular dependency)", async () => {
+  const map: SchemaModuleMap = {
+    modules: [
+      () => import("./fixtures/calendar"),
+      () => import("./fixtures/chats"),
+    ],
+    dependencies: {
+      0: [1],
+      1: [0],
+    },
+    sharedModule: () => import("./fixtures/shared"),
+    types: {
+      Query: {
+        events: 0,
+        chats: 1,
+      },
+      Mutation: {
+        addEvent: 0,
+      },
+      Subscription: {},
+    },
+  };
+  const sharedSpy = jest.spyOn(map, "sharedModule");
+  const chatsSpy = jest.fn(map.modules[1]);
+  const calendarSpy = jest.fn(map.modules[0]);
+  const link = createIncrementalSchemaLink({
+    map: {
+      ...map,
+      modules: [calendarSpy, chatsSpy],
+    },
+    schemaBuilder: schemaBuilder,
+  });
+  const result = await executeLink(link, {
+    query: parse(/* GraphQL */ `
+      {
+        events {
+          id
+        }
+      }
+    `),
+  });
+
+  expect(result.data!.events).toBeDefined();
+
+  expect(sharedSpy).toBeCalledTimes(1);
+  expect(chatsSpy).toBeCalledTimes(1);
+  expect(calendarSpy).toBeCalledTimes(1);
+});
+
+test("load a module without a non-existing dependency (incorrect index)", async () => {
+  const map: SchemaModuleMap = {
+    modules: [
+      () => import("./fixtures/calendar"),
+      () => import("./fixtures/chats"),
+    ],
+    dependencies: {
+      0: [2], // incorrect index
+    },
+    sharedModule: () => import("./fixtures/shared"),
+    types: {
+      Query: {
+        events: 0,
+        chats: 1,
+      },
+      Mutation: {
+        addEvent: 0,
+      },
+      Subscription: {},
+    },
+  };
+  const sharedSpy = jest.spyOn(map, "sharedModule");
+  const chatsSpy = jest.fn(map.modules[1]);
+  const calendarSpy = jest.fn(map.modules[0]);
+  const link = createIncrementalSchemaLink({
+    map: {
+      ...map,
+      modules: [calendarSpy, chatsSpy],
+    },
+    schemaBuilder: schemaBuilder,
+  });
+  const result = await executeLink(link, {
+    query: parse(/* GraphQL */ `
+      {
+        events {
+          id
+        }
+      }
+    `),
+  });
+
+  expect(result.data!.events).toBeDefined();
+
+  expect(sharedSpy).toBeCalledTimes(1);
+  expect(calendarSpy).toBeCalledTimes(1);
+  expect(chatsSpy).toBeCalledTimes(0);
+});
+
+test("accept non-default schema definition (root types)", async () => {
+  const map: SchemaModuleMap = {
+    modules: [
+      async () => ({
+        typeDefs: parse(/* GraphQL */ `
+          extend type RootQuery {
+            chats: [Int!]
+          }
+        `),
+        resolvers: {
+          RootQuery: {
+            chats() {
+              return [0, 1, 2];
+            },
+          },
+        },
+      }),
+    ],
+    sharedModule: async () => ({
+      typeDefs: parse(/* GraphQL */ `
+        type RootQuery {
+          ping: String
+        }
+
+        schema {
+          query: RootQuery
+        }
+      `),
+    }),
+    types: {
+      RootQuery: {
+        chats: 0,
+      },
+    },
+  };
+  const sharedSpy = jest.spyOn(map, "sharedModule");
+  const chatsSpy = jest.fn(map.modules[0]);
+  const link = createIncrementalSchemaLink({
+    map: {
+      ...map,
+      modules: [chatsSpy],
+    },
+    schemaDefinition: {
+      query: "RootQuery",
+      mutation: "RootMutation",
+      subscription: "RootSubscription",
+    },
+    schemaBuilder: schemaBuilder,
+  });
+  const result = await executeLink(link, {
+    query: parse(/* GraphQL */ `
+      {
+        chats {
+          id
+        }
+      }
+    `),
+  });
+
+  expect(result.data!.chats).toBeDefined();
+
+  expect(sharedSpy).toBeCalledTimes(1);
+  expect(chatsSpy).toBeCalledTimes(1);
 });
 
 test("memoize the result of schema building over time", async () => {
