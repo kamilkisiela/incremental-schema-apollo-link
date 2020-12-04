@@ -1,18 +1,14 @@
-import { ApolloLink, Operation } from "@apollo/client/link/core";
-import { fromPromise } from "@apollo/client/link/utils";
-import { setContext } from "@apollo/client/link/context";
-import {
+import type { Operation } from "@apollo/client/link/core";
+import type {
   OperationDefinitionNode,
   OperationTypeNode,
   DefinitionNode,
   DocumentNode,
   FieldNode,
-  execute,
-  Kind,
-  ExecutionResult,
   GraphQLSchema,
-  concatAST,
 } from "graphql";
+import { setContext } from "@apollo/client/link/context";
+import { Kind, concatAST } from "graphql";
 
 export { schemaBuilder } from "./schema-builder";
 
@@ -70,7 +66,6 @@ export type IncrementalSchemaLinkOptions<TContext = {}> = {
     resolvers: any[];
   }): GraphQLSchema;
   contextBuilder?: ContextBuilder<TContext>;
-  terminating?: boolean;
   schemaDefinition?: SchemaDefinition;
 };
 
@@ -93,7 +88,6 @@ export function createIncrementalSchemaLink<TContext = {}>({
     mutation: "Mutation",
     subscription: "Subscription",
   },
-  terminating = true,
 }: IncrementalSchemaLinkOptions<TContext>) {
   if (
     Object.values(schemaDefinition).length !== 3 ||
@@ -112,10 +106,6 @@ export function createIncrementalSchemaLink<TContext = {}>({
     contextBuilder,
     schemaDefinition,
   });
-
-  if (terminating) {
-    return new ApolloLink((op) => fromPromise(manager.execute(op)));
-  }
 
   return setContext(async (op, prev) => {
     const { schema, contextValue } = await manager.prepare(op as any);
@@ -249,17 +239,6 @@ function SchemaModulesManager({
   }
 
   return {
-    async execute(operation: Operation): Promise<ExecutionResult> {
-      const { schema, contextValue } = await prepare(operation);
-
-      return execute({
-        schema,
-        document: operation.query,
-        variableValues: operation.variables,
-        operationName: operation.operationName,
-        contextValue,
-      });
-    },
     prepare,
   };
 }

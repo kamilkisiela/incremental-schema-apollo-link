@@ -1,8 +1,31 @@
-import { execute, ApolloLink, GraphQLRequest } from "@apollo/client/link/core";
-import { toPromise } from "@apollo/client/link/utils";
-import { parse } from "graphql";
+import {
+  execute as executeApolloLink,
+  ApolloLink,
+  GraphQLRequest,
+  Operation,
+} from "@apollo/client/link/core";
+import { toPromise, fromPromise } from "@apollo/client/link/utils";
+import { parse, execute, ExecutionResult } from "graphql";
 import { schemaBuilder } from "../src/schema-builder";
 import { createIncrementalSchemaLink, SchemaModuleMap } from "../src";
+
+async function executeOperation(
+  operation: Operation
+): Promise<ExecutionResult> {
+  const { schema, contextValue } = operation.getContext().incremental;
+
+  return execute({
+    schema,
+    document: operation.query,
+    variableValues: operation.variables,
+    operationName: operation.operationName,
+    contextValue,
+  });
+}
+
+const terminatingLink = new ApolloLink((operation) =>
+  fromPromise(executeOperation(operation))
+);
 
 const schemaModuleMap: SchemaModuleMap = {
   modules: [
@@ -23,7 +46,9 @@ const schemaModuleMap: SchemaModuleMap = {
 };
 
 function executeLink(link: ApolloLink, operation: GraphQLRequest) {
-  return toPromise(execute(link, operation));
+  return toPromise(
+    executeApolloLink(ApolloLink.from([link, terminatingLink]), operation)
+  );
 }
 
 beforeEach(() => {
