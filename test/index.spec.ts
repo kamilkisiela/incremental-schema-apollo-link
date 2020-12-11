@@ -425,3 +425,38 @@ test("memoize the result of schema building over time", async () => {
 
   expect(buildSpy).toBeCalledTimes(2);
 });
+
+test("accept initial resolvers", async () => {
+  const chatsSpy = jest.fn(schemaModuleMap.modules[1]);
+  const calendarSpy = jest.fn(schemaModuleMap.modules[0]);
+  const chatTitleSpy = jest.fn((chat) => chat.title);
+  const resolvers = [
+    {
+      Chat: {
+        title: chatTitleSpy,
+      },
+    },
+  ];
+  const link = createIncrementalSchemaLink({
+    map: {
+      ...schemaModuleMap,
+      modules: [calendarSpy, chatsSpy],
+    },
+    resolvers,
+    schemaBuilder: schemaBuilder,
+  });
+  const result = await executeLink(link, {
+    query: parse(/* GraphQL */ `
+      {
+        chats {
+          id
+          title
+        }
+      }
+    `),
+  });
+
+  expect(result.data!.chats).toBeDefined();
+
+  expect(chatTitleSpy).toHaveBeenCalledTimes(3);
+});

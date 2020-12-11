@@ -21,11 +21,19 @@ type ContextBuilder<TContext = {}> = (input: {
 /**
  * Represents the exported keywords of a module
  */
-type SchemaModule<TContext = {}> = {
-  typeDefs: DocumentNode;
-  resolvers?: {};
-  context?(ctx: TContext): any;
-};
+type SchemaModule<TContext = {}> = EnsureProp<
+  {
+    typeDefs?: DocumentNode;
+    resolvers?: {};
+    context?(ctx: TContext): any;
+  },
+  "typeDefs",
+  "resolvers"
+>;
+
+type EnsureProp<T extends object, K1 extends keyof T, K2 extends keyof T> = T &
+  (Required<Pick<T, K1>> | Required<Pick<T, K2>> | Required<Pick<T, K1 | K2>>);
+
 /**
  * A function that loads a module
  */
@@ -66,6 +74,7 @@ export type IncrementalSchemaLinkOptions<TContext = {}> = {
     resolvers: any[];
   }): GraphQLSchema;
   contextBuilder?: ContextBuilder<TContext>;
+  resolvers?: any[];
   schemaDefinition?: SchemaDefinition;
 };
 
@@ -81,6 +90,7 @@ export type WithIncremental<T extends {}> = T & {
  */
 export function createIncrementalSchemaLink<TContext = {}>({
   map,
+  resolvers,
   schemaBuilder,
   contextBuilder,
   schemaDefinition = {
@@ -102,6 +112,7 @@ export function createIncrementalSchemaLink<TContext = {}>({
 
   const manager = SchemaModulesManager({
     map,
+    resolvers,
     schemaBuilder,
     contextBuilder,
     schemaDefinition,
@@ -154,6 +165,7 @@ function listDependencies(startAt: number[], map: SchemaModuleMap): number[] {
  */
 function SchemaModulesManager({
   map,
+  resolvers = [],
   schemaBuilder,
   contextBuilder,
   schemaDefinition,
@@ -200,8 +212,11 @@ function SchemaModulesManager({
     usedModules = usedModules.concat(ids).filter(onlyUnique);
 
     const schema = schemaBuilder({
-      typeDefs: concatAST(modules.map((m) => m.typeDefs)),
-      resolvers: modules.map((m) => m.resolvers || {}),
+      typeDefs: concatAST(modules.map((m) => m.typeDefs).filter(onlyDefined)),
+      resolvers: modules
+        .map((m) => m.resolvers || {})
+        .concat(...resolvers)
+        .filter(onlyDefined),
     });
 
     return schema;
