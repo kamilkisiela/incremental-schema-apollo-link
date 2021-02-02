@@ -13,7 +13,7 @@ import { Kind, concatAST } from "graphql";
 export { schemaBuilder } from "./schema-builder";
 
 type OperationType = SchemaDefinition[OperationTypeNode];
-type ContextBuilder<TContext = {}> = (input: {
+type ContextBuilder<TContext = any> = (input: {
   modules: SchemaModule<TContext>[];
   operation: Operation;
 }) => any;
@@ -21,10 +21,10 @@ type ContextBuilder<TContext = {}> = (input: {
 /**
  * Represents the exported keywords of a module
  */
-type SchemaModule<TContext = {}> = EnsureProp<
+type SchemaModule<TContext = any> = EnsureProp<
   {
     typeDefs?: DocumentNode;
-    resolvers?: {};
+    resolvers?: any;
     context?(ctx: TContext): any;
   },
   "typeDefs",
@@ -67,7 +67,7 @@ interface SchemaDefinition {
   subscription: string;
 }
 
-export type IncrementalSchemaLinkOptions<TContext = {}> = {
+export type IncrementalSchemaLinkOptions<TContext = any> = {
   map: SchemaModuleMap;
   schemaBuilder(input: {
     typeDefs: DocumentNode;
@@ -78,7 +78,7 @@ export type IncrementalSchemaLinkOptions<TContext = {}> = {
   schemaDefinition?: SchemaDefinition;
 };
 
-export type WithIncremental<T extends {}> = T & {
+export type WithIncremental<T extends any> = T & {
   incremental: {
     schema: GraphQLSchema;
     contextValue: any;
@@ -88,7 +88,7 @@ export type WithIncremental<T extends {}> = T & {
 /**
  * Creates an ApolloLink that lazy-loads parts of schema, with resolvers and context.
  */
-export function createIncrementalSchemaLink<TContext = {}>({
+export function createIncrementalSchemaLink<TContext = any>({
   map,
   resolvers,
   schemaBuilder,
