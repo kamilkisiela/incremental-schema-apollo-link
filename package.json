@@ -1,6 +1,7 @@
 {
   "name": "incremental-schema-apollo-link",
-  "version": "2.4.0",
+  "description": "Lazy load chunks of GraphQL Schema",
+  "version": "2.5.0",
   "sideEffects": false,
   "main": "dist/index.cjs.js",
   "module": "dist/index.esm.js",
