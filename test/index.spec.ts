@@ -194,16 +194,18 @@ test("load a module with its dependencies (including circular dependency)", asyn
     modules: [
       () => import("./fixtures/calendar"),
       () => import("./fixtures/chats"),
+      () => import("./fixtures/blog"),
     ],
     dependencies: {
       0: [1],
-      1: [0],
+      1: [0, 2],
     },
     sharedModule: () => import("./fixtures/shared"),
     types: {
       Query: {
         events: 0,
         chats: 1,
+        posts: 2,
       },
       Mutation: {
         addEvent: 0,
@@ -212,12 +214,13 @@ test("load a module with its dependencies (including circular dependency)", asyn
     },
   };
   const sharedSpy = jest.spyOn(map, "sharedModule");
-  const chatsSpy = jest.fn(map.modules[1]);
   const calendarSpy = jest.fn(map.modules[0]);
+  const chatsSpy = jest.fn(map.modules[1]);
+  const blogSpy = jest.fn(map.modules[2]);
   const link = createIncrementalSchemaLink({
     map: {
       ...map,
-      modules: [calendarSpy, chatsSpy],
+      modules: [calendarSpy, chatsSpy, blogSpy],
     },
     schemaBuilder: schemaBuilder,
   });
@@ -236,6 +239,7 @@ test("load a module with its dependencies (including circular dependency)", asyn
   expect(sharedSpy).toBeCalledTimes(1);
   expect(chatsSpy).toBeCalledTimes(1);
   expect(calendarSpy).toBeCalledTimes(1);
+  expect(blogSpy).toBeCalledTimes(1);
 });
 
 test("load a module without a non-existing dependency (incorrect index)", async () => {
