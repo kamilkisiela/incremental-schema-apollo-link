@@ -34,6 +34,9 @@ const map = {
     },
     Subscription: {},
   },
+  //
+  // Allow force pre-loading certain modules on first query
+  //   preloadModules: [0, 1]
 };
 
 const link = createIncrementalSchemaLink({
