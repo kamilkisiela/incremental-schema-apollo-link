@@ -464,3 +464,51 @@ test("accept initial resolvers", async () => {
 
   expect(chatTitleSpy).toHaveBeenCalledTimes(3);
 });
+
+test("preload specified modules even if they aren't requested", async () => {
+  const map: SchemaModuleMap = {
+    modules: [
+      () => import("./fixtures/calendar"),
+      () => import("./fixtures/chats"),
+      () => import("./fixtures/blog"),
+    ],
+    sharedModule: () => import("./fixtures/shared"),
+    preloadModules: [0],
+    dependencies: {
+      0: [2],
+    },
+    types: {
+      Query: {
+        events: 0,
+        chats: 1,
+        posts: 2,
+      },
+      Mutation: {},
+      Subscription: {},
+    },
+  };
+  const calendarSpy = jest.fn(map.modules[0]);
+  const chatsSpy = jest.fn(map.modules[1]);
+  const blogSpy = jest.fn(map.modules[2]);
+  const link = createIncrementalSchemaLink({
+    map: {
+      ...map,
+      modules: [calendarSpy, chatsSpy, blogSpy],
+    },
+    schemaBuilder: schemaBuilder,
+  });
+  const result = await executeLink(link, {
+    query: parse(/* GraphQL */ `
+      {
+        chats {
+          id
+          title
+        }
+      }
+    `),
+  });
+  expect(result.data!.chats).toBeDefined();
+  expect(calendarSpy).toBeCalledTimes(1);
+  expect(chatsSpy).toBeCalledTimes(1);
+  expect(calendarSpy).toBeCalledTimes(1);
+});

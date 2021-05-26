@@ -43,7 +43,10 @@ interface Dependencies {
   [moduleIndex: string]: number[] | undefined;
 }
 
+type ModuleList = number[];
+
 type SchemaModuleMapInternal = {
+  preloadModules?: ModuleList;
   modules?: SchemaModuleLoader[];
   dependencies?: Dependencies;
   sharedModule: SchemaModuleLoader;
@@ -170,7 +173,7 @@ function SchemaModulesManager({
   contextBuilder,
   schemaDefinition,
 }: IncrementalSchemaLinkOptions) {
-  let usedModules: number[] = [];
+  let usedModules: number[] = map.preloadModules || [];
 
   /**
    * Collects a list of required modules (based on root-level fields)
